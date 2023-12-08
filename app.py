@@ -182,4 +182,4 @@ def get_user_details(current_user):
 
 # Jalankan aplikasi Flask jika file ini dijalankan
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)), debug=True)
+    app.run(debug=True)
