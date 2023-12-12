@@ -4,6 +4,7 @@ import datetime
 from functools import wraps
 import hashlib
 import os
+import uuid
 from dotenv import load_dotenv
 from firebase_admin import credentials, firestore, initialize_app
 from firebase_config import get_firebase_config
@@ -93,8 +94,9 @@ def default_route():
 # API Register
 @app.route('/auth/register', methods=['POST'])
 def register():
-
+    # Deklarasikan sebagai variabel global
     global last_User_Id
+
     # Ambil data dari JSON request
     data = request.get_json()
     Email = data.get('Email')  
@@ -112,24 +114,31 @@ def register():
     if not Email:
         return jsonify({'message': 'Email cannot be empty!'}), 400
 
+    # Ambil User_Id terakhir dari Firestore
+    last_User_Id_ref = db.collection('users').order_by('User_Id', direction=firestore.Query.DESCENDING).limit(1).stream()
+    last_User_Id = 0
+    for doc in last_User_Id_ref:
+        last_User_Id = doc.get('User_Id')
+
+    # Increment User_Id
+    new_User_Id = last_User_Id + 1
+
     # Enkripsi Password menggunakan hashlib
     hashed_password = hashlib.sha256(Password.encode()).hexdigest()
 
     # Menyimpan data ke Firestore
     user_data = {
-        'Email': Email,  # Huruf besar di awal
+        'Email': Email,
         'Password': hashed_password,
-        'Address': Address,  # Huruf besar di awal
-        'Age': Age,  # Huruf besar di awal
-        'Name': Name,  # Huruf besar di awal
-        'User_Id': last_User_Id + 1, 
+        'Address': Address,
+        'Age': Age,
+        'Name': Name,
+        'User_Id': new_User_Id,
     }
 
     # Menambahkan data ke koleksi 'users'
     db.collection('users').add(user_data)
-    print(f"User added to Firestore with User_Id: {user_data['User_Id']}")
-
-    last_User_Id += 1
+    print(f"User added to Firestore with User_Id: {new_User_Id}")
 
     return jsonify({'message': 'User registered successfully!'}), 201
 
