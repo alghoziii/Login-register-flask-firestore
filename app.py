@@ -4,7 +4,6 @@ import datetime
 from functools import wraps
 import hashlib
 import os
-import uuid
 from dotenv import load_dotenv
 from firebase_admin import credentials, firestore, initialize_app
 from firebase_config import get_firebase_config
@@ -36,10 +35,14 @@ initialize_app(cred)
 # Inisialisasi Firestore
 db = firestore.client()
 
+last_User_Id = 0
+
 # Middleware untuk memeriksa keberadaan token
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
+
+        
         # Dapatkan token dari header request
         token = request.headers.get('Authorization')
 
@@ -76,7 +79,7 @@ def token_required(f):
             return jsonify({'message': 'Invalid token!'}), 401
         else:
             # Jika tidak ada masalah, tampilkan pesan sukses
-            print(f"User {current_user['email']} successfully authenticated.")
+            print(f"User {current_user['Email']} successfully authenticated.")
 
         # Panggil fungsi route dengan argumen pengguna saat ini
         return f(current_user, *args, **kwargs)
@@ -90,39 +93,43 @@ def default_route():
 # API Register
 @app.route('/auth/register', methods=['POST'])
 def register():
+
+    global last_User_Id
     # Ambil data dari JSON request
     data = request.get_json()
-    email = data.get('email')
-    password = data.get('password')
-    address = data.get('address')
-    age = data.get('age')
-    name = data.get('name')
+    Email = data.get('Email')  
+    Password = data.get('Password')  
+    Address = data.get('Address')  
+    Age = data.get('Age')  
+    Name = data.get('Name')  
 
-    # Cek apakah email sudah terdaftar di Firestore
-    user_ref = db.collection('users').where('email', '==', email).get()
+    # Cek apakah Email sudah terdaftar di Firestore
+    user_ref = db.collection('users').where('Email', '==', Email).get()
     if len(user_ref) > 0:
         return jsonify({'message': 'Email sudah terdaftar!'}), 400
 
-    # Pastikan nilai email tidak kosong
-    if not email:
+    # Pastikan nilai Email tidak kosong
+    if not Email:
         return jsonify({'message': 'Email cannot be empty!'}), 400
 
-    # Enkripsi password menggunakan hashlib
-    hashed_password = hashlib.sha256(password.encode()).hexdigest()
+    # Enkripsi Password menggunakan hashlib
+    hashed_password = hashlib.sha256(Password.encode()).hexdigest()
 
     # Menyimpan data ke Firestore
     user_data = {
-        'email': email,
-        'password': hashed_password,
-        'address': address,
-        'age': age,
-        'name': name,
-        'user_id': str(uuid.uuid4()), 
+        'Email': Email,  # Huruf besar di awal
+        'Password': hashed_password,
+        'Address': Address,  # Huruf besar di awal
+        'Age': Age,  # Huruf besar di awal
+        'Name': Name,  # Huruf besar di awal
+        'User_Id': last_User_Id + 1, 
     }
 
     # Menambahkan data ke koleksi 'users'
     db.collection('users').add(user_data)
-    print(f"User added to Firestore with user_id: {user_data['user_id']}")
+    print(f"User added to Firestore with User_Id: {user_data['User_Id']}")
+
+    last_User_Id += 1
 
     return jsonify({'message': 'User registered successfully!'}), 201
 
@@ -130,29 +137,29 @@ def register():
 @app.route('/auth/login', methods=['POST'])
 def login():
     data = request.get_json()
-    email = data.get('email')
-    password = data.get('password')
+    Email = data.get('Email')
+    Password = data.get('Password')
 
-    print(f"Received login request with email: {email}, password: {password}")
+    print(f"Received login request with Email: {Email}, Password: {Password}")
 
-    if not email or not password:
-        return jsonify({'error': 'Invalid email or password'}), 400
+    if not Email or not Password:
+        return jsonify({'error': 'Invalid Email or Password'}), 400
 
-    user_ref = db.collection('users').where('email', '==', email).get()
+    user_ref = db.collection('users').where('Email', '==', Email).get()
 
-    print(f"Email: {email}, User reference: {user_ref}")
+    print(f"Email: {Email}, User reference: {user_ref}")
 
     if len(user_ref) == 0:
-        print(f"User with email {email} not found in Firestore.")
+        print(f"User with Email {Email} not found in Firestore.")
         return jsonify({'error': 'User not found'}), 404
 
     user_data = user_ref[0].to_dict()
 
-    hashed_password = hashlib.sha256(password.encode()).hexdigest()
-    print(f"Hashed password from input: {hashed_password}, Hashed password from database: {user_data.get('password', '')}")
+    hashed_password = hashlib.sha256(Password.encode()).hexdigest()
+    print(f"Hashed Password from input: {hashed_password}, Hashed Password from database: {user_data.get('Password', '')}")
     
-    if hashed_password != user_data.get('password'):
-        return jsonify({'error': 'Invalid password'}), 401
+    if hashed_password != user_data.get('Password'):
+        return jsonify({'error': 'Invalid Password'}), 401
 
     user_id = str(user_data.get('user_id'))
 
@@ -174,7 +181,7 @@ def get_user_details(current_user):
     # Kembalikan detail pengguna dalam respons JSON
     return jsonify({
         'user_id': current_user.get('user_id', ''),
-        'email': current_user.get('email', ''),
+        'Email': current_user.get('Email', ''),
         'name': current_user.get('name', ''),
         'age': current_user.get('age', 0),
         'address': current_user.get('address', '')
@@ -182,4 +189,4 @@ def get_user_details(current_user):
 
 # Jalankan aplikasi Flask jika file ini dijalankan
 if __name__ == '__main__':
-    app.run(debug=True)
+     app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080)), debug=True)
